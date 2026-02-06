@@ -9,10 +9,23 @@ from html import unescape
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
-DB_PATH = os.path.join(BASE_DIR, "mcnex_dart.db")
-LIST_PATH = os.path.join(BASE_DIR, "disclosure_list.json")
+from config import get_company_dir
+
+if len(sys.argv) < 2:
+    print("사용법: python build_db.py <종목코드>")
+    print("예시:   python build_db.py 097520")
+    sys.exit(1)
+
+STOCK_CODE = sys.argv[1]
+COMPANY_DIR = get_company_dir(STOCK_CODE)
+if not COMPANY_DIR:
+    print(f"종목코드 {STOCK_CODE}에 해당하는 회사 폴더를 찾을 수 없습니다.")
+    print("먼저 download_all.py를 실행하세요.")
+    sys.exit(1)
+
+DOWNLOAD_DIR = os.path.join(COMPANY_DIR, "downloads")
+DB_PATH = os.path.join(COMPANY_DIR, "dart.db")
+LIST_PATH = os.path.join(COMPANY_DIR, "disclosure_list.json")
 
 
 def strip_xml_tags(text):
@@ -61,6 +74,7 @@ def main():
         disclosures = json.load(f)
 
     print(f"공시 목록: {len(disclosures)}건")
+    print(f"회사 폴더: {COMPANY_DIR}")
 
     # Create database
     if os.path.exists(DB_PATH):
@@ -252,7 +266,7 @@ def main():
     conn.close()
     print()
     print("사용 예시:")
-    print("  sqlite3 mcnex_dart.db")
+    print(f"  sqlite3 \"{DB_PATH}\"")
     print("  SELECT * FROM disclosures WHERE report_nm LIKE '%사업보고서%';")
     print("  SELECT * FROM documents_fts WHERE body_text MATCH '매출';")
 

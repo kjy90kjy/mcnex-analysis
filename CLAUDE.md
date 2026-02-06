@@ -2,165 +2,204 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-# 엠씨넥스(MCNEX) 기업분석 프로젝트
+## 프로젝트 개요
 
-## 회사 개요
+OpenDART API에서 한국 상장기업의 공시 데이터를 수집하고, SQLite DB로 정제한 뒤, openpyxl로 엑셀 보고서를 생성하는 범용 기업분석 파이프라인.
 
-- **회사명**: (주)엠씨넥스 / MCNEX CO.,LTD
-- **종목코드**: 097520 (코스닥)
-- **DART 고유번호**: 00564562
-- **대표이사**: 민동욱
-- **설립일**: 2004년 12월 22일
-- **본사**: 인천광역시 연수구 송도과학로16번길 13-39 엠씨넥스타워
-- **업종코드**: 26519 (기타 영상기기 제조업)
-- **홈페이지**: www.mcnex.co.kr
-- **주요사업**: CCM(카메라모듈) 기술 기반 영상전문기업. 휴대폰용 카메라모듈, 자동차용 카메라모듈이 주력. 엑츄에이터, 생체인식모듈, 멀티카메라, 블랙박스, 로봇, CCTV, 3D 카메라모듈 등으로 영역 확장.
-- **종속회사**: 엠씨넥스VINA(베트남, 카메라모듈 제조), 엠씨넥스상해전자무역유한공사(중국, 수출입/CS), 엠씨넥스에프앤비(음식점)
+종목코드만 입력하면 **어떤 기업이든** 동일한 방법으로 데이터 수집 → DB 구축 → AI 분석용 DB 생성이 가능.
 
-## 데이터 파이프라인
+## 분석 완료 기업
 
-3단계 순서로 실행해야 함. 모든 스크립트는 Python 3, 주요 의존성은 `requests`뿐.
+| 종목코드 | 기업명 | 업종 | 보고서 수 | 비고 |
+|----------|--------|------|----------|------|
+| 097520 | 엠씨넥스 | 카메라모듈 부품 | 5종 | 최초 구축 |
+| 035250 | 강원랜드 | 카지노/리조트 | 6종 | 규제독점, 무차입경영 |
+
+## 폴더 구조
+
+```
+mcnex-analysis/
+  config.py              # API 키 + 공용 유틸리티 (get_company_dir, ensure_company_dir)
+  run_pipeline.py        # 전체 파이프라인 한번에 실행
+  download_all.py        # 1단계: 공시 다운로드
+  build_db.py            # 2단계: 원문 DB 생성
+  build_full_db.py       # 3단계: 구조화 DB 생성
+  build_ai_db.py         # 4단계: 통합 AI DB 생성
+  Method/                # 분석 프레임워크 문서 (Korean_Guru_Framework.md 포함)
+  companies/
+    097520_엠씨넥스/     # 종목코드_회사명 폴더
+      create_report.py        # → 엠씨넥스_기업분석보고서.xlsx (9시트)
+      create_valuation.py     # → 엠씨넥스_밸류에이션.xlsx (5시트)
+      create_combined.py      # → 엠씨넥스_종합보고서.xlsx (12시트)
+      create_mobile.py        # → 엠씨넥스_모바일용.xlsx (단일시트)
+      create_guru_report.py   # → 엠씨넥스_투자구루분석.xlsx (7시트)
+    035250_강원랜드/
+      create_report.py        # → 강원랜드_기업분석보고서.xlsx (9시트)
+      create_valuation.py     # → 강원랜드_밸류에이션.xlsx (5시트)
+      create_combined.py      # → 강원랜드_종합보고서.xlsx (12시트)
+      create_mobile.py        # → 강원랜드_모바일용.xlsx (단일시트)
+      create_guru_report.py   # → 강원랜드_투자구루분석.xlsx (7시트)
+      create_profit_analysis.py # → 강원랜드_이익역성장분석.xlsx (7시트)
+```
+
+각 회사 폴더에는 파이프라인 실행 시 자동 생성되는 파일도 포함:
+- `company_info.json`, `disclosure_list.json` (메타데이터)
+- `downloads/` (공시 ZIP 파일)
+- `dart.db` (원문 DB, FTS), `full.db` (구조화 DB), `ai.db` (통합 분석용 DB)
+- `*.xlsx` (보고서 출력)
+
+## 실행 명령어
+
+모든 스크립트는 Python 3. 의존성은 `requests`(데이터 수집)와 `openpyxl`(보고서 생성).
+
+**Windows 인코딩 주의**: `run_pipeline.py`로 실행 시 UnicodeEncodeError 발생 가능. 아래처럼 개별 실행 권장:
+```bash
+set PYTHONIOENCODING=utf-8 && python -X utf8 download_all.py 035250
+```
+
+### 전체 파이프라인 (종목코드만 입력)
 
 ```bash
-# 1단계: OpenDART에서 574건 공시 원본 ZIP 다운로드 → downloads/ + disclosure_list.json
-python download_all.py
+# 새 기업 분석 (전체 4단계 자동 실행)
+python run_pipeline.py 097520    # 엠씨넥스
+python run_pipeline.py 035250    # 강원랜드
 
-# 2단계: ZIP → XML 파싱 → mcnex_dart.db (원문 전체, 153MB, FTS 검색 지원)
-python build_db.py
-
-# 3단계-A: OpenDART 구조화 API 15종 호출 → mcnex_full.db (정량 데이터)
-python build_full_db.py
-
-# 3단계-B: mcnex_full.db + mcnex_dart.db 통합 → mcnex_ai.db (분석용 최종 DB)
-python build_ai_db.py
+# 개별 단계 실행 (Windows 인코딩 문제 시)
+set PYTHONIOENCODING=utf-8 && python -X utf8 download_all.py 035250
+set PYTHONIOENCODING=utf-8 && python -X utf8 build_db.py 035250
+set PYTHONIOENCODING=utf-8 && python -X utf8 build_full_db.py 035250
+set PYTHONIOENCODING=utf-8 && python -X utf8 build_ai_db.py 035250
 ```
 
-| 스크립트 | 입력 | 출력 | 소요시간 |
-|----------|------|------|----------|
-| `download_all.py` | OpenDART API | `downloads/`, `disclosure_list.json` | ~10분 (API 제한) |
-| `build_db.py` | `downloads/*.zip`, `disclosure_list.json` | `mcnex_dart.db` | ~1분 |
-| `build_full_db.py` | OpenDART API | `mcnex_full.db` | ~30분 (API 호출 多) |
-| `build_ai_db.py` | `mcnex_full.db`, `mcnex_dart.db` | `mcnex_ai.db` | ~10초 |
-
-`build_ai_db.py`에서 사업보고서 원문(mcnex_dart.db)의 BODY 텍스트를 정규식으로 8개 섹션(회사개요/연혁/사업내용/제품/연구개발/위험관리/임원보수/주주배당)으로 분리 추출함. 특허/경영이벤트/잠정실적도 패턴 매칭으로 추출.
-
-## DB 접근 방법
-
-분석 시 SQLite CLI 또는 Python sqlite3 모듈로 `mcnex_ai.db`만 열면 됨.
+### 보고서 생성 (회사 폴더에서 실행)
 
 ```bash
-sqlite3 mcnex_ai.db "SELECT * FROM v_annual_performance;"
+# 엠씨넥스
+cd companies/097520_엠씨넥스
+python create_report.py           # → 기업분석보고서 (9시트)
+python create_valuation.py        # → 밸류에이션 (5시트, 독립형)
+python create_combined.py         # → 종합보고서 (12시트)
+python create_mobile.py           # → 모바일용 (단일시트, 3열 세로)
+python create_guru_report.py      # → 투자구루분석 (7시트, Buffett/Munger)
+
+# 강원랜드
+cd companies/035250_강원랜드
+set PYTHONIOENCODING=utf-8 && python -X utf8 create_report.py
+set PYTHONIOENCODING=utf-8 && python -X utf8 create_valuation.py
+set PYTHONIOENCODING=utf-8 && python -X utf8 create_combined.py
+set PYTHONIOENCODING=utf-8 && python -X utf8 create_mobile.py
+set PYTHONIOENCODING=utf-8 && python -X utf8 create_guru_report.py
+set PYTHONIOENCODING=utf-8 && python -X utf8 create_profit_analysis.py  # 이익역성장 분석 (강원랜드 전용)
 ```
 
-```python
-import sqlite3
-conn = sqlite3.connect('mcnex_ai.db')
-conn.execute("SELECT * FROM v_annual_performance").fetchall()
+## 아키텍처
+
+### 데이터 흐름
+
+```
+OpenDART API ─→ download_all.py ─→ companies/{code}_{name}/downloads/*.zip
+                                  + disclosure_list.json + company_info.json
+                                          │
+                                    build_db.py ─→ dart.db (원문, FTS)
+                                          │
+OpenDART API ─→ build_full_db.py ─→ full.db (구조화 정량)
+                                          │
+                           dart.db ──┐    │
+                                     ▼    ▼
+                                build_ai_db.py ─→ ai.db (통합 분석용)
+                                                      │
+                            ┌──────────┬──────────┬───┘
+                            ▼          ▼          ▼
+                     create_report  create_combined  create_mobile
+                     create_valuation  create_guru_report
+                     create_profit_analysis (강원랜드 전용)
 ```
 
-## 핵심 DB 파일
+### 스크립트 역할
 
-### `mcnex_ai.db` (5.5MB) — AI 분석용 통합 DB (이것만 사용하면 됨)
+| 스크립트 | 입력 | 출력 | 핵심 로직 |
+|----------|------|------|-----------|
+| `config.py` | - | - | API_KEY, get_company_dir(), ensure_company_dir() |
+| `run_pipeline.py` | 종목코드 | - | subprocess로 4단계 순차 실행 |
+| `download_all.py` | 종목코드 | `downloads/`, `disclosure_list.json`, `company_info.json` | corpCode.xml에서 고유번호 조회 → 공시목록 페이징 → 문서 ZIP 다운로드 |
+| `build_db.py` | 종목코드 | `dart.db` | ZIP 내 XML을 멀티인코딩으로 파싱, BODY 텍스트 추출, FTS5 인덱스 |
+| `build_full_db.py` | 종목코드 | `full.db` | 15종 구조화 API를 연도×보고서구분 조합으로 호출 |
+| `build_ai_db.py` | 종목코드 | `ai.db` | full_db + dart_db 통합, 사업보고서 8개 섹션 분리, 특허/이벤트/잠정실적 패턴매칭 |
+| `create_*.py` | `ai.db` | xlsx | 회사별 보고서 생성 (회사 폴더 내 위치) |
 
-OpenDART에서 수집한 구조화 데이터 + 공시 원문에서 추출한 핵심 텍스트를 통합한 SQLite DB.
+### 보고서 종류 (6종)
 
-#### 정량 데이터 테이블
+| 보고서 | 시트 수 | 설명 |
+|--------|---------|------|
+| `create_report.py` | 9시트 | 기업분석보고서 (표지~모니터링) |
+| `create_valuation.py` | 5시트 | 밸류에이션 (PER/PBR/EV_EBITDA/RIM/시나리오) |
+| `create_combined.py` | 12시트 | 종합보고서 (report + valuation 통합) |
+| `create_mobile.py` | 1시트 | 모바일용 (3열 세로, 큰 폰트) |
+| `create_guru_report.py` | 7시트 | 투자구루분석 (Buffett/Munger Four Filters) |
+| `create_profit_analysis.py` | 7시트 | 이익역성장분석 (강원랜드 전용, 비용구조·일시적요인·인건비) |
 
-| 테이블 | 설명 | 건수 | 비고 |
-|--------|------|------|------|
-| `company_info` | 기업개황 | 1 | 대표, 주소, 설립일, 업종 |
-| `disclosures` | 전체 공시 목록 | 574 | 2007~2026년 모든 공시 타임라인 |
-| `financial_statements` | 전체 재무제표 | 11,764 | BS/CIS/CF 모든 계정, 연결+개별, 2012~2024 |
-| `financial_summary` | 주요계정 요약 | 2,074 | 분기/반기/연간별 핵심 계정 |
-| `executives` | 임원현황 | 70 | 성명, 직위, 담당업무, 재직기간, 최대주주관계 |
-| `employees` | 직원현황 | 12 | 인원수, 평균근속, 급여총액 |
-| `dividends` | 배당현황 | 149 | 배당성향, 주당배당금 등 |
-| `treasury_stock` | 자기주식 | 216 | 취득/처분 이력 |
-| `capital_changes` | 증자/감자 | 346 | 유상증자, 무상증자, 전환 등 이력 |
-| `stock_total` | 주식 총수 | 32 | 발행주식, 자기주식, 유통주식 |
-| `investments` | 타법인 출자 | 67 | 자회사/관계사 투자 현황 |
-| `minority_shareholders` | 소액주주 | 12 | 소액주주 비율 |
-| `individual_pay` | 고액보수 | 8 | 5억 이상 개인별 보수 |
+### 보고서 스크립트 패턴
 
-#### 정성 데이터 테이블 (텍스트)
+모든 보고서 스크립트가 동일한 패턴:
+1. openpyxl 스타일 상수 정의 (NAVY, DARK_BLUE 등 색상 + Font/Fill/Alignment/Border 객체)
+2. 헬퍼 함수: `sw()`, `wh()`, `wr()`, `st()`, `fmt()`, `fw()`, `pct()`
+3. 시트별 순차 생성: 데이터 배열 → 행 단위 write → 수식 삽입
+4. 대부분의 보고서는 재무 데이터가 파이썬 상수로 하드코딩 (DB 의존 최소화)
 
-| 테이블 | 설명 | 건수 | 비고 |
-|--------|------|------|------|
-| `business_report_sections` | 사업보고서 핵심 섹션 | 102 | 13년치 × 8개 섹션(회사개요/사업내용/제품/연구개발/위험관리/임원보수/주주배당/연혁) |
-| `patents` | 특허 공시 | 24 | 특허명, 상세내용, 취득일, 활용계획 |
-| `key_events` | 주요 경영 이벤트 | 157 | 증자/투자/배당/자기주식/채무보증/IR/실적변동 등 |
-| `earnings_announcements` | 잠정실적 공시 | 21 | 분기별 잠정 영업실적 |
+### DB 스키마 (ai.db)
 
-#### 편의 뷰
+분석 시 `ai.db`만 사용하면 됨. 모든 기업 공통 스키마.
 
-| 뷰 | 설명 |
-|----|------|
-| `v_annual_performance` | 연도별 매출/영업이익/순이익/EPS/총자산/총부채/총자본 (연결) |
-| `v_annual_dividends` | 연도별 배당 |
-| `v_major_shareholder_history` | 대주주 변동 이력 |
-| `v_executive_history` | 임원 변동 이력 |
-| `v_disclosure_timeline` | 전체 공시 타임라인 (최신순) |
-| `v_business_sections` | 사업보고서 섹션별 미리보기 |
-| `v_patent_history` | 특허 이력 |
-| `v_event_timeline` | 경영 이벤트 타임라인 |
-| `v_db_summary` | DB 전체 테이블별 건수 |
+**정량 테이블**: `company_info`, `disclosures`, `financial_statements`, `financial_summary`, `executives`, `employees`, `dividends`, `treasury_stock`, `capital_changes`, `stock_total`, `investments`, `minority_shareholders`, `individual_pay`
 
-### 기타 파일
+**정성 테이블**: `business_report_sections` (연도×8섹션), `patents`, `key_events`, `earnings_announcements`
 
-| 파일 | 설명 |
-|------|------|
-| `mcnex_dart.db` (153MB) | 574건 공시 원문 XML 전체 (상세 텍스트 필요 시 참조) |
-| `mcnex_full.db` (3.8MB) | 구조화 데이터만 (mcnex_ai.db에 포함됨) |
-| `downloads/` | 574건 공시 원본 ZIP 파일 |
-| `disclosure_list.json` | 공시 목록 JSON |
+**편의 뷰**: `v_annual_performance`, `v_annual_dividends`, `v_major_shareholder_history`, `v_executive_history`, `v_disclosure_timeline`, `v_business_sections`, `v_patent_history`, `v_event_timeline`, `v_db_summary`
+
+### 주요 컨벤션
+
+- 재무제표 금액 단위: **원** (억원 변환 시 ÷ 100,000,000)
+- `reprt_code`: 11011=사업보고서, 11012=반기, 11013=1분기, 11014=3분기
+- `sj_div`: BS=재무상태표, CIS=포괄손익계산서, CF=현금흐름표
+- 연결 재무제표: `reprt_nm LIKE '%연결%'` / 개별: `reprt_nm LIKE '%개별%'`
+- `business_report_sections.section_name` 값: 회사개요, 회사연혁, 사업내용, 주요제품_매출, 연구개발, 위험관리_전망, 임원_보수, 주주_배당
+- API 키는 `config.py`에 중앙 관리
+- 회사 폴더: `companies/{종목코드}_{회사명}/` 형식으로 자동 생성
+- 데이터 출처: OpenDART API (https://opendart.fss.or.kr)
+
+### 기업별 데이터 특이사항
+
+**강원랜드 (035250)**:
+- 매출 계정명이 연도별로 다름: "매출" (2015-2018) → "수익(매출액)" (2019+)
+- `v_annual_performance` 뷰가 잘못된 매출값 반환 → 직접 쿼리 필요
+- 2021-2024 연결 영업이익이 사업보고서(11011) financial_statements에 누락 → 잠정실적으로 보완
+- employees 테이블 데이터가 모두 NULL (API에서 미반환)
+- 개별 보수 공시 미해당 (CEO 보수 비공개)
+- 특허 없음 (카지노업)
+- treasury_stock의 stock_knd가 연도별로 '보통주식'/'보통주'/None 혼재
 
 ## 자주 쓰는 쿼리
 
 ```sql
--- 연도별 핵심 실적 (연결)
+-- 연도별 핵심 실적 (연결) — 강원랜드는 이 뷰가 부정확할 수 있음
 SELECT * FROM v_annual_performance;
 
--- 특정 연도 사업보고서 '사업내용' 읽기
+-- 강원랜드 매출액 직접 쿼리 (계정명 변경 대응)
+SELECT bsns_year, thstrm_amount FROM financial_statements
+WHERE (account_nm='수익(매출액)' OR account_nm='매출')
+AND sj_div='CIS' AND reprt_code='11011' AND reprt_nm LIKE '%연결%'
+ORDER BY bsns_year;
+
+-- 특정 연도 사업보고서 섹션 읽기
 SELECT section_text FROM business_report_sections
 WHERE bsns_year = '2024' AND section_name = '사업내용';
 
--- 전체 특허 이력
+-- 특허 이력
 SELECT rcept_dt, patent_name, patent_detail, patent_plan FROM patents ORDER BY rcept_dt;
 
 -- 주요 이벤트 타임라인
 SELECT rcept_dt, event_type, event_summary FROM key_events ORDER BY rcept_dt DESC;
 
--- 특정 재무 계정 연도별 추이 (예: 매출액)
-SELECT bsns_year, thstrm_amount FROM financial_statements
-WHERE account_nm LIKE '%매출액%' AND sj_div='CIS' AND reprt_code='11011' AND reprt_nm LIKE '%연결%'
-ORDER BY bsns_year;
-
--- 임원 현황 (최신)
-SELECT nm, ofcps, chrg_job, hffc_pd, tenure_end_on FROM executives
-WHERE bsns_year = (SELECT MAX(bsns_year) FROM executives);
-
--- 배당 이력
-SELECT * FROM dividends WHERE se LIKE '%주당%배당금%' ORDER BY bsns_year;
-
--- 자회사 투자 현황 (최신)
-SELECT inv_prm, trmend_blce_qota_rt, trmend_blce_acntbk_amount
-FROM investments WHERE bsns_year = (SELECT MAX(bsns_year) FROM investments);
-
--- 본문 전체 검색 (사업보고서 내)
-SELECT bsns_year, section_name, section_text FROM business_report_sections
-WHERE section_text LIKE '%자동차%카메라%';
-
--- 잠정실적 공시 이력
+-- 잠정실적 공시
 SELECT rcept_dt, report_nm, content FROM earnings_announcements ORDER BY rcept_dt DESC;
 ```
-
-## 분석 시 참고사항
-
-- 재무제표 금액 단위: **원** (억원 변환 시 ÷ 100,000,000)
-- `reprt_code`: 11011=사업보고서, 11012=반기, 11013=1분기, 11014=3분기
-- `sj_div`: BS=재무상태표, CIS=포괄손익계산서, CF=현금흐름표, SCE=자본변동표
-- 연결 재무제표: `reprt_nm LIKE '%연결%'` / 개별: `reprt_nm LIKE '%개별%'`
-- `business_report_sections.section_name` 값: 회사개요, 회사연혁, 사업내용, 주요제품_매출, 연구개발, 위험관리_전망, 임원_보수, 주주_배당
-- 2012년부터 사업보고서 존재 (2007~2011은 감사보고서만 있음)
-- 데이터 출처: OpenDART API (https://opendart.fss.or.kr)
-- 수집일: 2026-02-06

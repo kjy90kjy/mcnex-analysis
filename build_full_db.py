@@ -4,13 +4,31 @@ import json
 import time
 import os
 import sys
+from datetime import datetime
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-API_KEY = "fee81b8f1226ef15d145dbfa04d0569e34ac1656"
-CORP_CODE = "00564562"
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "mcnex_full.db")
+from config import API_KEY, get_company_dir
+
+if len(sys.argv) < 2:
+    print("사용법: python build_full_db.py <종목코드>")
+    print("예시:   python build_full_db.py 097520")
+    sys.exit(1)
+
+STOCK_CODE = sys.argv[1]
+COMPANY_DIR = get_company_dir(STOCK_CODE)
+if not COMPANY_DIR:
+    print(f"종목코드 {STOCK_CODE}에 해당하는 회사 폴더를 찾을 수 없습니다.")
+    print("먼저 download_all.py를 실행하세요.")
+    sys.exit(1)
+
+# company_info.json에서 corp_code 읽기
+info_path = os.path.join(COMPANY_DIR, "company_info.json")
+with open(info_path, "r", encoding="utf-8") as f:
+    company_info = json.load(f)
+CORP_CODE = company_info["corp_code"]
+
+DB_PATH = os.path.join(COMPANY_DIR, "full.db")
 
 # 보고서 코드
 REPRT_CODES = {
@@ -20,8 +38,8 @@ REPRT_CODES = {
     "11014": "3분기보고서",
 }
 
-# 사업연도 범위
-YEARS = list(range(2007, 2026))
+# 사업연도 범위 (동적)
+YEARS = list(range(2007, datetime.now().year + 1))
 
 def api_call(endpoint, params, retries=2):
     """OpenDART API 호출"""
@@ -106,19 +124,10 @@ def create_tables(conn):
         -- ==============================
         CREATE TABLE IF NOT EXISTS executives (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            bsns_year TEXT,
-            reprt_code TEXT,
-            rcept_no TEXT,
-            nm TEXT,           -- 성명
-            sexdstn TEXT,      -- 성별
-            birth_ym TEXT,     -- 출생년월
-            ofcps TEXT,        -- 직위
-            rgist_exctv_at TEXT, -- 등기임원여부
-            fte_at TEXT,       -- 상근여부
-            chrg_job TEXT,     -- 담당업무
-            mxmm_shrholdr_relate TEXT, -- 최대주주와의 관계
-            hffc_pd TEXT,      -- 재직기간
-            tenure_end_on TEXT -- 임기만료일
+            bsns_year TEXT, reprt_code TEXT, rcept_no TEXT,
+            nm TEXT, sexdstn TEXT, birth_ym TEXT, ofcps TEXT,
+            rgist_exctv_at TEXT, fte_at TEXT, chrg_job TEXT,
+            mxmm_shrholdr_relate TEXT, hffc_pd TEXT, tenure_end_on TEXT
         );
 
         -- ==============================
@@ -126,22 +135,13 @@ def create_tables(conn):
         -- ==============================
         CREATE TABLE IF NOT EXISTS employees (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            bsns_year TEXT,
-            reprt_code TEXT,
-            rcept_no TEXT,
-            fo_bbm TEXT,       -- 사업부문
-            sexdstn TEXT,      -- 성별
-            reform_bfe_emp_co_rgllbr TEXT, -- 정규직
-            reform_bfe_emp_co_cnttk TEXT,  -- 계약직
-            reform_bfe_emp_co_etc TEXT,
-            rgllbr_co TEXT,
-            rgllbr_abacpt_labrr_co TEXT,
-            cnttk_co TEXT,
-            cnttk_abacpt_labrr_co TEXT,
-            sm TEXT,           -- 합계
-            avrg_cnwk_sdytrn TEXT, -- 평균근속연수
-            fyer_salary_totamt TEXT, -- 연간급여총액
-            jan_salary_am TEXT -- 1인평균급여액
+            bsns_year TEXT, reprt_code TEXT, rcept_no TEXT,
+            fo_bbm TEXT, sexdstn TEXT,
+            reform_bfe_emp_co_rgllbr TEXT, reform_bfe_emp_co_cnttk TEXT,
+            reform_bfe_emp_co_etc TEXT, rgllbr_co TEXT,
+            rgllbr_abacpt_labrr_co TEXT, cnttk_co TEXT,
+            cnttk_abacpt_labrr_co TEXT, sm TEXT,
+            avrg_cnwk_sdytrn TEXT, fyer_salary_totamt TEXT, jan_salary_am TEXT
         );
 
         -- ==============================
@@ -149,17 +149,10 @@ def create_tables(conn):
         -- ==============================
         CREATE TABLE IF NOT EXISTS major_shareholders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            bsns_year TEXT,
-            reprt_code TEXT,
-            rcept_no TEXT,
-            nm TEXT,           -- 성명
-            relate TEXT,       -- 관계
-            stock_knd TEXT,    -- 주식종류
-            bsis_posesn_stock_co TEXT,  -- 기초소유주식수
-            bsis_posesn_stock_qota_rt TEXT, -- 기초지분율
-            trmend_posesn_stock_co TEXT,    -- 기말소유주식수
-            trmend_posesn_stock_qota_rt TEXT, -- 기말지분율
-            rm TEXT
+            bsns_year TEXT, reprt_code TEXT, rcept_no TEXT,
+            nm TEXT, relate TEXT, stock_knd TEXT,
+            bsis_posesn_stock_co TEXT, bsis_posesn_stock_qota_rt TEXT,
+            trmend_posesn_stock_co TEXT, trmend_posesn_stock_qota_rt TEXT, rm TEXT
         );
 
         -- ==============================
@@ -167,15 +160,9 @@ def create_tables(conn):
         -- ==============================
         CREATE TABLE IF NOT EXISTS minority_shareholders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            bsns_year TEXT,
-            reprt_code TEXT,
-            rcept_no TEXT,
-            se TEXT,
-            shrholdr_co TEXT,
-            shrholdr_tot_co TEXT,
-            shrholdr_rate TEXT,
-            hold_stock_co TEXT,
-            stock_tot_co TEXT,
+            bsns_year TEXT, reprt_code TEXT, rcept_no TEXT,
+            se TEXT, shrholdr_co TEXT, shrholdr_tot_co TEXT,
+            shrholdr_rate TEXT, hold_stock_co TEXT, stock_tot_co TEXT,
             hold_stock_rate TEXT
         );
 
@@ -184,14 +171,8 @@ def create_tables(conn):
         -- ==============================
         CREATE TABLE IF NOT EXISTS dividends (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            bsns_year TEXT,
-            reprt_code TEXT,
-            rcept_no TEXT,
-            se TEXT,           -- 구분
-            stock_knd TEXT,    -- 주식종류
-            thstrm TEXT,       -- 당기
-            frmtrm TEXT,       -- 전기
-            lwfr TEXT          -- 전전기
+            bsns_year TEXT, reprt_code TEXT, rcept_no TEXT,
+            se TEXT, stock_knd TEXT, thstrm TEXT, frmtrm TEXT, lwfr TEXT
         );
 
         -- ==============================
@@ -199,19 +180,10 @@ def create_tables(conn):
         -- ==============================
         CREATE TABLE IF NOT EXISTS treasury_stock (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            bsns_year TEXT,
-            reprt_code TEXT,
-            rcept_no TEXT,
-            stock_knd TEXT,
-            acqs_mth1 TEXT,
-            acqs_mth2 TEXT,
-            acqs_mth3 TEXT,
-            bsis_qy TEXT,
-            change_qy_acqs TEXT,
-            change_qy_dsps TEXT,
-            change_qy_incnr TEXT,
-            trmend_qy TEXT,
-            rm TEXT
+            bsns_year TEXT, reprt_code TEXT, rcept_no TEXT,
+            stock_knd TEXT, acqs_mth1 TEXT, acqs_mth2 TEXT, acqs_mth3 TEXT,
+            bsis_qy TEXT, change_qy_acqs TEXT, change_qy_dsps TEXT,
+            change_qy_incnr TEXT, trmend_qy TEXT, rm TEXT
         );
 
         -- ==============================
@@ -219,16 +191,10 @@ def create_tables(conn):
         -- ==============================
         CREATE TABLE IF NOT EXISTS capital_changes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            bsns_year TEXT,
-            reprt_code TEXT,
-            rcept_no TEXT,
-            isu_dcrs_de TEXT,
-            isu_dcrs_stle TEXT,
-            isu_dcrs_stock_knd TEXT,
-            isu_dcrs_qy TEXT,
-            isu_dcrs_mstvdv_fval_amount TEXT,
-            isu_dcrs_mstvdv_amount TEXT,
-            rm TEXT
+            bsns_year TEXT, reprt_code TEXT, rcept_no TEXT,
+            isu_dcrs_de TEXT, isu_dcrs_stle TEXT, isu_dcrs_stock_knd TEXT,
+            isu_dcrs_qy TEXT, isu_dcrs_mstvdv_fval_amount TEXT,
+            isu_dcrs_mstvdv_amount TEXT, rm TEXT
         );
 
         -- ==============================
@@ -236,18 +202,10 @@ def create_tables(conn):
         -- ==============================
         CREATE TABLE IF NOT EXISTS stock_total (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            bsns_year TEXT,
-            reprt_code TEXT,
-            rcept_no TEXT,
-            se TEXT,
-            isu_stock_totqy TEXT,
-            now_to_isu_stock_totqy TEXT,
-            now_to_dcrs_stock_totqy TEXT,
-            redc TEXT,
-            rdmstkdiv TEXT,
-            istc_totqy TEXT,
-            tesstk_co TEXT,
-            distb_stock_co TEXT
+            bsns_year TEXT, reprt_code TEXT, rcept_no TEXT,
+            se TEXT, isu_stock_totqy TEXT, now_to_isu_stock_totqy TEXT,
+            now_to_dcrs_stock_totqy TEXT, redc TEXT, rdmstkdiv TEXT,
+            istc_totqy TEXT, tesstk_co TEXT, distb_stock_co TEXT
         );
 
         -- ==============================
@@ -255,22 +213,13 @@ def create_tables(conn):
         -- ==============================
         CREATE TABLE IF NOT EXISTS investments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            bsns_year TEXT,
-            reprt_code TEXT,
-            rcept_no TEXT,
-            inv_prm TEXT,      -- 법인명
-            frst_acqs_de TEXT, -- 최초취득일
-            invstmnt_purps TEXT, -- 투자목적
-            frst_acqs_amount TEXT,
-            bsis_blce_qy TEXT,
-            bsis_blce_qota_rt TEXT,
-            bsis_blce_acntbk_amount TEXT,
-            incrs_dcrs_acqs_dsps_qy TEXT,
-            incrs_dcrs_acqs_dsps_amount TEXT,
-            incrs_dcrs_evl_lstmn TEXT,
-            trmend_blce_qy TEXT,
-            trmend_blce_qota_rt TEXT,
-            trmend_blce_acntbk_amount TEXT,
+            bsns_year TEXT, reprt_code TEXT, rcept_no TEXT,
+            inv_prm TEXT, frst_acqs_de TEXT, invstmnt_purps TEXT,
+            frst_acqs_amount TEXT, bsis_blce_qy TEXT,
+            bsis_blce_qota_rt TEXT, bsis_blce_acntbk_amount TEXT,
+            incrs_dcrs_acqs_dsps_qy TEXT, incrs_dcrs_acqs_dsps_amount TEXT,
+            incrs_dcrs_evl_lstmn TEXT, trmend_blce_qy TEXT,
+            trmend_blce_qota_rt TEXT, trmend_blce_acntbk_amount TEXT,
             recent_bsns_year_fnnr_sttus_tot_assets TEXT,
             recent_bsns_year_fnnr_sttus_thstrm_ntpf TEXT
         );
@@ -280,13 +229,8 @@ def create_tables(conn):
         -- ==============================
         CREATE TABLE IF NOT EXISTS exec_compensation (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            bsns_year TEXT,
-            reprt_code TEXT,
-            rcept_no TEXT,
-            se TEXT,
-            nmpr TEXT,
-            mendng_totamt TEXT,
-            jan_avrg_mendng_am TEXT
+            bsns_year TEXT, reprt_code TEXT, rcept_no TEXT,
+            se TEXT, nmpr TEXT, mendng_totamt TEXT, jan_avrg_mendng_am TEXT
         );
 
         -- ==============================
@@ -294,12 +238,8 @@ def create_tables(conn):
         -- ==============================
         CREATE TABLE IF NOT EXISTS individual_pay (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            bsns_year TEXT,
-            reprt_code TEXT,
-            rcept_no TEXT,
-            nm TEXT,
-            ofcps TEXT,
-            mendng_totamt TEXT,
+            bsns_year TEXT, reprt_code TEXT, rcept_no TEXT,
+            nm TEXT, ofcps TEXT, mendng_totamt TEXT,
             mendng_totamt_ct_incls_mendng TEXT
         );
 
@@ -308,15 +248,9 @@ def create_tables(conn):
         -- ==============================
         CREATE TABLE IF NOT EXISTS outside_directors (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            bsns_year TEXT,
-            reprt_code TEXT,
-            rcept_no TEXT,
-            nm TEXT,
-            main_career TEXT,
-            maxholder_relate TEXT,
-            apntmt_dt TEXT,
-            enddt TEXT,
-            rmndt TEXT
+            bsns_year TEXT, reprt_code TEXT, rcept_no TEXT,
+            nm TEXT, main_career TEXT, maxholder_relate TEXT,
+            apntmt_dt TEXT, enddt TEXT, rmndt TEXT
         );
 
         -- 인덱스
@@ -386,6 +320,9 @@ def main():
 
     conn = sqlite3.connect(DB_PATH)
     create_tables(conn)
+
+    print(f"회사 폴더: {COMPANY_DIR}")
+    print(f"고유번호: {CORP_CODE}")
 
     # ============ 1. 기업개황 ============
     print("=" * 60)
@@ -461,7 +398,7 @@ def main():
     print("=" * 60)
     print("기존 공시 목록 통합")
     print("=" * 60)
-    list_path = os.path.join(BASE_DIR, "disclosure_list.json")
+    list_path = os.path.join(COMPANY_DIR, "disclosure_list.json")
     if os.path.exists(list_path):
         conn.execute("""
             CREATE TABLE IF NOT EXISTS disclosures (

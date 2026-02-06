@@ -1,8 +1,8 @@
 """
-엠씨넥스 AI 분석용 통합 DB 생성
-- mcnex_full.db: 구조화된 재무/임원/배당 등 정량 데이터
-- mcnex_dart.db: 공시 원문에서 핵심 텍스트 추출
-→ mcnex_ai.db: 하나로 통합
+AI 분석용 통합 DB 생성
+- full.db: 구조화된 재무/임원/배당 등 정량 데이터
+- dart.db: 공시 원문에서 핵심 텍스트 추출
+→ ai.db: 하나로 통합
 """
 import sqlite3
 import os
@@ -12,10 +12,23 @@ from html import unescape
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FULL_DB = os.path.join(BASE_DIR, "mcnex_full.db")
-DART_DB = os.path.join(BASE_DIR, "mcnex_dart.db")
-AI_DB = os.path.join(BASE_DIR, "mcnex_ai.db")
+from config import get_company_dir
+
+if len(sys.argv) < 2:
+    print("사용법: python build_ai_db.py <종목코드>")
+    print("예시:   python build_ai_db.py 097520")
+    sys.exit(1)
+
+STOCK_CODE = sys.argv[1]
+COMPANY_DIR = get_company_dir(STOCK_CODE)
+if not COMPANY_DIR:
+    print(f"종목코드 {STOCK_CODE}에 해당하는 회사 폴더를 찾을 수 없습니다.")
+    print("먼저 download_all.py와 build_full_db.py를 실행하세요.")
+    sys.exit(1)
+
+FULL_DB = os.path.join(COMPANY_DIR, "full.db")
+DART_DB = os.path.join(COMPANY_DIR, "dart.db")
+AI_DB = os.path.join(COMPANY_DIR, "ai.db")
 
 if os.path.exists(AI_DB):
     os.remove(AI_DB)
@@ -49,10 +62,11 @@ def extract_section(text, start_patterns, end_patterns, max_len=5000):
 
 # ============================================================
 print("=" * 60)
-print("STEP 1: 구조화 데이터 복사 (mcnex_full.db → mcnex_ai.db)")
+print("STEP 1: 구조화 데이터 복사 (full.db → ai.db)")
 print("=" * 60)
+print(f"  회사 폴더: {COMPANY_DIR}")
 
-# mcnex_full.db를 기반으로 복사
+# full.db를 기반으로 복사
 conn_full = sqlite3.connect(FULL_DB)
 conn_ai = sqlite3.connect(AI_DB)
 

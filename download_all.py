@@ -4,13 +4,18 @@ import io
 import xml.etree.ElementTree as ET
 import json
 import os
+import sys
 import time
 
-API_KEY = "fee81b8f1226ef15d145dbfa04d0569e34ac1656"
-STOCK_CODE = "097520"
+from config import API_KEY, ensure_company_dir
+
+if len(sys.argv) < 2:
+    print("사용법: python download_all.py <종목코드>")
+    print("예시:   python download_all.py 097520")
+    sys.exit(1)
+
+STOCK_CODE = sys.argv[1]
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
-os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 # ============ STEP 1: corpCode.xml에서 고유번호 찾기 ============
 print("=" * 60)
@@ -56,6 +61,17 @@ print(f"  회사명: {corp_name}")
 print(f"  고유번호: {corp_code}")
 print(f"  종목코드: {STOCK_CODE}")
 
+# 회사 폴더 생성
+COMPANY_DIR = ensure_company_dir(STOCK_CODE, corp_name)
+DOWNLOAD_DIR = os.path.join(COMPANY_DIR, "downloads")
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+# company_info.json 저장
+info_path = os.path.join(COMPANY_DIR, "company_info.json")
+with open(info_path, "w", encoding="utf-8") as f:
+    json.dump({"stock_code": STOCK_CODE, "corp_code": corp_code, "corp_name": corp_name}, f, ensure_ascii=False, indent=2)
+print(f"  회사 폴더: {COMPANY_DIR}")
+
 # ============ STEP 2: 전체 공시 목록 수집 ============
 print()
 print("=" * 60)
@@ -96,7 +112,7 @@ while True:
     time.sleep(0.5)  # API 호출 간격
 
 # 목록 저장
-with open(os.path.join(BASE_DIR, "disclosure_list.json"), "w", encoding="utf-8") as f:
+with open(os.path.join(COMPANY_DIR, "disclosure_list.json"), "w", encoding="utf-8") as f:
     json.dump(all_disclosures, f, ensure_ascii=False, indent=2)
 
 print(f"\n  총 {len(all_disclosures)}건 공시 목록 저장 완료 (disclosure_list.json)")
