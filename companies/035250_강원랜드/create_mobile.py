@@ -5,6 +5,9 @@ sys.stdout.reconfigure(encoding='utf-8')
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.page import PageMargins
+from openpyxl.worksheet.properties import PageSetupProperties
+from openpyxl.worksheet.worksheet import Worksheet
 
 # === CONSTANTS ===
 COMPANY = "강원랜드"
@@ -115,6 +118,19 @@ COL3 = [14, 18, 18]
 def sw(ws, w):
     for i, v in enumerate(w, 1): ws.column_dimensions[get_column_letter(i)].width = v
 
+def setup_print(ws):
+    ws.page_setup.paperSize = Worksheet.PAPERSIZE_LETTER
+    ws.page_setup.orientation = Worksheet.ORIENTATION_LANDSCAPE
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+    ws.page_margins = PageMargins(
+        left=0.25, right=0.25, top=0.75, bottom=0.75,
+        header=0.3, footer=0.3
+    )
+    ws.print_options.horizontalCentered = True
+
+
 def mhdr(ws, r, vals):
     """모바일 헤더"""
     for i, v in enumerate(vals, 1):
@@ -158,6 +174,7 @@ ws = wb.active
 ws.title = "강원랜드 분석"
 ws.sheet_properties.tabColor = NAVY
 sw(ws, COL3)
+setup_print(ws)
 
 row = 1
 

@@ -5,6 +5,9 @@ sys.stdout.reconfigure(encoding='utf-8')
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.page import PageMargins
+from openpyxl.worksheet.properties import PageSetupProperties
+from openpyxl.worksheet.worksheet import Worksheet
 
 DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ai.db")
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -83,6 +86,17 @@ NF='#,##0'; PF='0.0%'
 
 def sw(ws,w):
     for i,v in enumerate(w,1): ws.column_dimensions[get_column_letter(i)].width=v
+def setup_print(ws):
+    ws.page_setup.paperSize = Worksheet.PAPERSIZE_LETTER
+    ws.page_setup.orientation = Worksheet.ORIENTATION_LANDSCAPE
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+    ws.page_margins = PageMargins(
+        left=0.25, right=0.25, top=0.75, bottom=0.75,
+        header=0.3, footer=0.3
+    )
+    ws.print_options.horizontalCentered = True
 def wh(ws,r,h,fills=None):
     for i,v in enumerate(h,1):
         c=ws.cell(row=r,column=i,value=v); c.font=hdr_font; c.fill=fills[i-1] if fills else hf; c.alignment=ca; c.border=tb
@@ -241,6 +255,7 @@ wb = Workbook()
 # ============================================================
 ws1 = wb.active; ws1.title="Four Filters"; ws1.sheet_properties.tabColor=NAVY
 sw(ws1,[4,22,14,14,14,14,14,14,4])
+setup_print(ws1)
 
 # Title banner
 for r in range(1,6):
@@ -387,6 +402,7 @@ print("  [1/7] Four Filters 대시보드")
 # ============================================================
 ws2 = wb.create_sheet("경제적_해자"); ws2.sheet_properties.tabColor=DARK
 sw(ws2,[20,16,16,16,16,16,16,16])
+setup_print(ws2)
 
 row=1; st(ws2,row,"경제적 해자(Economic Moat) 분석",8); row+=1
 
@@ -472,6 +488,7 @@ print("  [2/7] 경제적 해자")
 # ============================================================
 ws3 = wb.create_sheet("경영진_평가"); ws3.sheet_properties.tabColor=GOLD_C
 sw(ws3,[20,16,16,16,16,16,16,16])
+setup_print(ws3)
 
 row=1; st(ws3,row,"경영진 평가 (Management Quality)",8); row+=1
 
@@ -550,6 +567,7 @@ print("  [3/7] 경영진 평가")
 # ============================================================
 ws4 = wb.create_sheet("자본배분"); ws4.sheet_properties.tabColor="E74C3C"
 sw(ws4,[14,14,14,14,14,14,14,14])
+setup_print(ws4)
 
 row=1; st(ws4,row,"자본배분 이력 (Capital Allocation History)",8); row+=1
 
@@ -665,6 +683,7 @@ print("  [4/7] 자본배분")
 # ============================================================
 ws5 = wb.create_sheet("수익성_품질"); ws5.sheet_properties.tabColor="8E44AD"
 sw(ws5,[14,14,14,14,14,14,14,14])
+setup_print(ws5)
 
 row=1; st(ws5,row,"수익성 품질 분석 (Earnings Quality)",8); row+=1
 
@@ -797,6 +816,7 @@ print("  [5/7] 수익성 품질")
 # ============================================================
 ws6 = wb.create_sheet("내재가치_안전마진"); ws6.sheet_properties.tabColor="2980B9"
 sw(ws6,[22,16,16,16,16,16,16,16])
+setup_print(ws6)
 
 row=1; st(ws6,row,"내재가치 & 안전마진 분석",8); row+=1
 
@@ -918,6 +938,7 @@ print("  [6/7] 내재가치/안전마진")
 # ============================================================
 ws7 = wb.create_sheet("투자판정"); ws7.sheet_properties.tabColor="1ABC9C"
 sw(ws7,[22,16,16,16,16,16,16,16])
+setup_print(ws7)
 
 row=1
 # Title banner

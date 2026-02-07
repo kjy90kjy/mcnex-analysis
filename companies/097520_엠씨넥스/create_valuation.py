@@ -4,6 +4,9 @@ sys.stdout.reconfigure(encoding='utf-8')
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, numbers
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.page import PageMargins
+from openpyxl.worksheet.properties import PageSetupProperties
+from openpyxl.worksheet.worksheet import Worksheet
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "엠씨넥스_밸류에이션.xlsx")
 wb = Workbook()
@@ -108,6 +111,19 @@ def set_widths(ws, widths):
     for i, w in enumerate(widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
+def setup_print(ws):
+    """Letter 용지 가로(Landscape) 인쇄 최적화 설정"""
+    ws.page_setup.paperSize = Worksheet.PAPERSIZE_LETTER
+    ws.page_setup.orientation = Worksheet.ORIENTATION_LANDSCAPE
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+    ws.page_margins = PageMargins(
+        left=0.25, right=0.25, top=0.5, bottom=0.5,
+        header=0.3, footer=0.3
+    )
+    ws.print_options.horizontalCentered = True
+
 def write_header(ws, row, vals, fills=None):
     for i, v in enumerate(vals, 1):
         c = ws.cell(row=row, column=i, value=v)
@@ -176,6 +192,7 @@ ws1 = wb.active
 ws1.title = "종합"
 ws1.sheet_properties.tabColor = "1B2A4A"
 set_widths(ws1, [22, 18, 18, 18, 18, 22])
+setup_print(ws1)
 
 # Title bar
 row = 1
@@ -268,6 +285,7 @@ print("  [1/5] 종합 대시보드 완료")
 ws2 = wb.create_sheet("PER분석")
 ws2.sheet_properties.tabColor = "2980B9"
 set_widths(ws2, [24, 16, 16, 16, 16, 20])
+setup_print(ws2)
 
 row = 1
 row = section_title(ws2, row, "PER 다각도 분석 (현재가 28,100원 기준)", 6)
@@ -386,6 +404,7 @@ print("  [2/5] PER 분석 완료")
 ws3 = wb.create_sheet("PBR_ROE")
 ws3.sheet_properties.tabColor = "8E44AD"
 set_widths(ws3, [20, 16, 16, 16, 16, 22])
+setup_print(ws3)
 
 row = 1
 row = section_title(ws3, row, "PBR / ROE / 잔여이익모델(RIM) 분석", 6)
@@ -485,6 +504,7 @@ print("  [3/5] PBR/ROE 완료")
 ws4 = wb.create_sheet("EV_EBITDA_FCF")
 ws4.sheet_properties.tabColor = "E67E22"
 set_widths(ws4, [24, 18, 18, 18, 24])
+setup_print(ws4)
 
 row = 1
 row = section_title(ws4, row, "EV/EBITDA & FCF 밸류에이션", 5)
@@ -604,6 +624,7 @@ print("  [4/5] EV/EBITDA/FCF 완료")
 ws5 = wb.create_sheet("목표주가")
 ws5.sheet_properties.tabColor = "2ECC71"
 set_widths(ws5, [22, 18, 18, 18, 22])
+setup_print(ws5)
 
 row = 1
 row = section_title(ws5, row, "시나리오별 목표주가 종합 (현재가 28,100원)", 5)

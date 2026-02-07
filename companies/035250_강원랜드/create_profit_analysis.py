@@ -5,6 +5,9 @@ sys.stdout.reconfigure(encoding='utf-8')
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.page import PageMargins
+from openpyxl.worksheet.properties import PageSetupProperties
+from openpyxl.worksheet.worksheet import Worksheet
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 억 = 100_000_000
@@ -129,6 +132,17 @@ NF='#,##0'; PF='0.0%'; PF1='0.0%'
 
 def sw(ws,w):
     for i,v in enumerate(w,1): ws.column_dimensions[get_column_letter(i)].width=v
+def setup_print(ws):
+    ws.page_setup.paperSize = Worksheet.PAPERSIZE_LETTER
+    ws.page_setup.orientation = Worksheet.ORIENTATION_LANDSCAPE
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+    ws.page_margins = PageMargins(
+        left=0.25, right=0.25, top=0.75, bottom=0.75,
+        header=0.3, footer=0.3
+    )
+    ws.print_options.horizontalCentered = True
 def wh(ws,r,h,fills=None):
     for i,v in enumerate(h,1):
         c=ws.cell(row=r,column=i,value=v); c.font=hdr_font; c.fill=fills[i-1] if fills else hf; c.alignment=ca; c.border=tb
@@ -158,6 +172,7 @@ wb = Workbook()
 # ============================================================
 ws = wb.active; ws.title = "요약"
 sw(ws,[4,22,14,14,14,14,14,14])
+setup_print(ws)
 
 # Title banner
 ws.merge_cells("A1:H2")
@@ -237,6 +252,7 @@ for frow in factors:
 # ============================================================
 ws2 = wb.create_sheet("비용구조")
 sw(ws2,[4,20,14,14,14,14,14,14])
+setup_print(ws2)
 
 ws2.merge_cells("A1:H2")
 c=ws2.cell(row=1,column=1,value="비용구조 분석: 매출원가·판관비 추이"); c.font=title_font; c.fill=tf; c.alignment=ca
@@ -328,6 +344,7 @@ note(ws2,r+1,"Q1은 전년 수준 유지, Q2부터 급격 악화. 특히 Q4는 O
 # ============================================================
 ws3 = wb.create_sheet("일시적요인")
 sw(ws3,[4,22,14,14,14,14,14,14])
+setup_print(ws3)
 
 ws3.merge_cells("A1:H2")
 c=ws3.cell(row=1,column=1,value="일시적 요인: 기타수익·금융자산평가이익"); c.font=title_font; c.fill=tf; c.alignment=ca
@@ -395,6 +412,7 @@ r = bullet(ws3,r,"• 이는 카지노 영업과 무관한 금융투자 수익 �
 # ============================================================
 ws4 = wb.create_sheet("퇴직급여")
 sw(ws4,[4,22,14,14,14,14,14,14])
+setup_print(ws4)
 
 ws4.merge_cells("A1:H2")
 c=ws4.cell(row=1,column=1,value="퇴직급여 분석: 경상적 비용, 금액 자체는 소규모"); c.font=title_font; c.fill=tf; c.alignment=ca
@@ -435,6 +453,7 @@ r = bullet(ws4,r,"결론: 퇴직급여는 경상적이나 이익 역성장의 �
 # ============================================================
 ws5 = wb.create_sheet("인건비구조")
 sw(ws5,[4,28,14,14,14,14,14,14])
+setup_print(ws5)
 
 ws5.merge_cells("A1:H2")
 c=ws5.cell(row=1,column=1,value="인건비 구조: 절감 가능성 분석"); c.font=title_font; c.fill=tf; c.alignment=ca
@@ -491,6 +510,7 @@ r = bullet(ws5,r,"유일한 해결책: 제2카지노영업장 완공(1,796억 �
 # ============================================================
 ws6 = wb.create_sheet("매출천장")
 sw(ws6,[4,14,14,14,14,14,14,14])
+setup_print(ws6)
 
 ws6.merge_cells("A1:H2")
 c=ws6.cell(row=1,column=1,value="매출 천장: 규제가 만든 성장의 한계"); c.font=title_font; c.fill=tf; c.alignment=ca
@@ -553,6 +573,7 @@ r = bullet(ws6,r,"• 리스크: 감가상각비 연 100~150억 추가 부담, �
 # ============================================================
 ws7 = wb.create_sheet("종합판단")
 sw(ws7,[4,28,14,14,14,14,14,14])
+setup_print(ws7)
 
 ws7.merge_cells("A1:H2")
 c=ws7.cell(row=1,column=1,value="종합 판단: 해자는 건재하나 효율화 유인 부재"); c.font=title_font; c.fill=tf; c.alignment=ca

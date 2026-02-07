@@ -5,6 +5,9 @@ sys.stdout.reconfigure(encoding='utf-8')
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.page import PageMargins
+from openpyxl.worksheet.properties import PageSetupProperties
+from openpyxl.worksheet.worksheet import Worksheet
 
 DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ai.db")
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -89,6 +92,17 @@ NF='#,##0'; PF='0.0%'
 
 def sw(ws,w):
     for i,v in enumerate(w,1): ws.column_dimensions[get_column_letter(i)].width=v
+def setup_print(ws):
+    ws.page_setup.paperSize = Worksheet.PAPERSIZE_LETTER
+    ws.page_setup.orientation = Worksheet.ORIENTATION_LANDSCAPE
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+    ws.page_margins = PageMargins(
+        left=0.25, right=0.25, top=0.75, bottom=0.75,
+        header=0.3, footer=0.3
+    )
+    ws.print_options.horizontalCentered = True
 def wh(ws,r,h,fills=None):
     for i,v in enumerate(h,1):
         c=ws.cell(row=r,column=i,value=v); c.font=hdr_font; c.fill=fills[i-1] if fills else hf; c.alignment=ca; c.border=tb
@@ -112,6 +126,7 @@ wb = Workbook()
 # ============================================================
 ws = wb.active; ws.title="표지"; ws.sheet_properties.tabColor=NAVY
 sw(ws,[3,20,20,20,20,20,3])
+setup_print(ws)
 for r in range(1,35):
     for c in range(1,8): ws.cell(row=r,column=c).fill=tf
 ws.merge_cells('B6:F6')
@@ -157,6 +172,7 @@ print("  [1/12] 표지")
 # ============================================================
 ws2=wb.create_sheet("핵심실적"); ws2.sheet_properties.tabColor=DARK
 sw(ws2,[14,14,14,14,12,14,14,14,12,12,14])
+setup_print(ws2)
 perf=conn.execute("SELECT * FROM v_annual_performance").fetchall()
 row=1; ws2.merge_cells('A1:K1')
 ws2.cell(row=1,column=1,value="10년 연결 재무실적 (단위: 억원)").font=sec_font
@@ -198,6 +214,7 @@ print("  [2/12] 핵심실적")
 # ============================================================
 ws3=wb.create_sheet("2025실적"); ws3.sheet_properties.tabColor=GREEN_C
 sw(ws3,[14,14,14,14,14,16,16])
+setup_print(ws3)
 row=1; ws3.merge_cells('A1:G1')
 ws3.cell(row=1,column=1,value="2025년 분기별 잠정실적 (단위: 백만원)").font=sec_font
 ws3.cell(row=1,column=1).border=bb; row=3
@@ -228,6 +245,7 @@ print("  [3/12] 2025실적")
 # ============================================================
 ws4=wb.create_sheet("사업구조"); ws4.sheet_properties.tabColor=GOLD_C
 sw(ws4,[18,14,14,14,14,14,14,14])
+setup_print(ws4)
 row=1; ws4.merge_cells('A1:H1')
 ws4.cell(row=1,column=1,value="사업부문별 매출 구조 (연결, 단위: 억원)").font=sec_font
 ws4.cell(row=1,column=1).border=bb; row=3
@@ -256,6 +274,7 @@ print("  [4/12] 사업구조")
 # ============================================================
 ws5=wb.create_sheet("주주환원"); ws5.sheet_properties.tabColor="E74C3C"
 sw(ws5,[12,14,12,14,14,14])
+setup_print(ws5)
 row=1; ws5.merge_cells('A1:F1')
 ws5.cell(row=1,column=1,value="배당 및 주주환원 정책").font=sec_font; ws5.cell(row=1,column=1).border=bb; row=3
 wh(ws5,row,["연도","주당배당(원)","EPS(원)","배당성향","배당수익률","비고"]); row+=1
@@ -295,6 +314,7 @@ print("  [5/12] 주주환원")
 # ============================================================
 ws6=wb.create_sheet("R&D_특허"); ws6.sheet_properties.tabColor="8E44AD"
 sw(ws6,[14,50,14,14])
+setup_print(ws6)
 row=1; ws6.merge_cells('A1:D1')
 ws6.cell(row=1,column=1,value="연구개발 및 특허 현황").font=sec_font; ws6.cell(row=1,column=1).border=bb
 row=3; st(ws6,row,"연구개발비 추이",4); row+=1
@@ -318,6 +338,7 @@ print("  [6/12] R&D_특허")
 # ============================================================
 ws7=wb.create_sheet("밸류에이션"); ws7.sheet_properties.tabColor="E67E22"
 sw(ws7,[22,18,18,18,18,22])
+setup_print(ws7)
 row=1; ws7.merge_cells('A1:F2')
 c=ws7.cell(row=1,column=1,value=f"엠씨넥스 밸류에이션 종합 (현재가 {PRICE:,}원)")
 c.font=Font(name="맑은 고딕",size=18,bold=True,color=W); c.fill=tf; c.alignment=ca
@@ -364,6 +385,7 @@ print("  [7/12] 밸류에이션 종합")
 # ============================================================
 ws8=wb.create_sheet("PER분석"); ws8.sheet_properties.tabColor="2980B9"
 sw(ws8,[24,16,16,16,16,20])
+setup_print(ws8)
 row=1; st(ws8,row,f"PER 다각도 분석 (현재가 {PRICE:,}원)",6); row+=1
 st(ws8,row,"A. EPS 산출 방식별 PER",6); row+=1
 wh(ws8,row,["산출 방식","순이익(억)","EPS(원)","PER(배)","의미","비고"]); row+=1
@@ -419,6 +441,7 @@ print("  [8/12] PER분석")
 # ============================================================
 ws9=wb.create_sheet("PBR_ROE_RIM"); ws9.sheet_properties.tabColor="8E44AD"
 sw(ws9,[20,16,16,16,16,22])
+setup_print(ws9)
 row=1; st(ws9,row,"PBR / ROE / 잔여이익모델(RIM)",6); row+=1
 
 # Historical
@@ -467,6 +490,7 @@ print("  [9/12] PBR/ROE/RIM")
 # ============================================================
 ws10=wb.create_sheet("EV_EBITDA_FCF"); ws10.sheet_properties.tabColor="E67E22"
 sw(ws10,[24,18,18,18,24])
+setup_print(ws10)
 row=1; st(ws10,row,"EV/EBITDA & FCF 밸류에이션",5); row+=1
 
 # EV
@@ -526,6 +550,7 @@ print("  [10/12] EV/EBITDA/FCF")
 # ============================================================
 ws11=wb.create_sheet("시나리오_SWOT"); ws11.sheet_properties.tabColor="2ECC71"
 sw(ws11,[22,18,18,18,22])
+setup_print(ws11)
 row=1; st(ws11,row,f"시나리오별 목표주가 (현재가 {PRICE:,}원)",5); row+=1
 
 # Scenario table
@@ -600,6 +625,7 @@ print("  [11/12] 시나리오/SWOT")
 # ============================================================
 ws12=wb.create_sheet("모니터링"); ws12.sheet_properties.tabColor="1ABC9C"
 sw(ws12,[6,30,40,20])
+setup_print(ws12)
 row=1; ws12.merge_cells('A1:D1')
 ws12.cell(row=1,column=1,value="향후 핵심 모니터링 지표").font=sec_font; ws12.cell(row=1,column=1).border=bb; row=3
 wh(ws12,row,["#","항목","세부 내용","확인 시기"]); row+=1

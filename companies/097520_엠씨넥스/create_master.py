@@ -44,6 +44,12 @@ def copy_sheet(src_ws, dst_wb, title):
     dst_ws.sheet_properties = copy.copy(src_ws.sheet_properties)
     if src_ws.print_options:
         dst_ws.print_options = copy.copy(src_ws.print_options)
+    if src_ws.page_setup:
+        dst_ws.page_setup = copy.copy(src_ws.page_setup)
+    if src_ws.page_margins:
+        dst_ws.page_margins = copy.copy(src_ws.page_margins)
+    if src_ws.sheet_properties.pageSetUpPr:
+        dst_ws.sheet_properties.pageSetUpPr = copy.copy(src_ws.sheet_properties.pageSetUpPr)
     return dst_ws
 
 

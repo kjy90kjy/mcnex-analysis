@@ -5,6 +5,9 @@ sys.stdout.reconfigure(encoding='utf-8')
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, numbers
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.page import PageMargins
+from openpyxl.worksheet.properties import PageSetupProperties
+from openpyxl.worksheet.worksheet import Worksheet
 
 DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ai.db")
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "강원랜드_기업분석보고서.xlsx")
@@ -97,6 +100,20 @@ def write_data_row(ws, row, data, col_start=1, fonts=None, fills=None, alignment
 def set_col_widths(ws, widths):
     for i, w in enumerate(widths):
         ws.column_dimensions[get_column_letter(i+1)].width = w
+
+
+def setup_print(ws):
+    """Letter 가로 인쇄 설정 - 폭 1페이지에 맞춤"""
+    ws.page_setup.paperSize = Worksheet.PAPERSIZE_LETTER
+    ws.page_setup.orientation = Worksheet.ORIENTATION_LANDSCAPE
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+    ws.page_margins = PageMargins(
+        left=0.25, right=0.25, top=0.75, bottom=0.75,
+        header=0.3, footer=0.3
+    )
+    ws.print_options.horizontalCentered = True
 
 def add_section_title(ws, row, title, col_end=11):
     ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=col_end)
@@ -214,6 +231,7 @@ ws1 = wb.active
 ws1.title = "표지"
 ws1.sheet_properties.tabColor = NAVY
 set_col_widths(ws1, [3, 20, 20, 20, 20, 20, 3])
+setup_print(ws1)
 
 for r in range(1, 35):
     for c in range(1, 8):
@@ -276,6 +294,7 @@ print("  [1/9] 표지 완료")
 ws2 = wb.create_sheet("핵심실적")
 ws2.sheet_properties.tabColor = "2C3E6B"
 set_col_widths(ws2, [14, 14, 14, 14, 12, 14, 14, 14, 12, 12, 14])
+setup_print(ws2)
 
 row = 1
 ws2.merge_cells('A1:K1')
@@ -400,6 +419,7 @@ print("  [2/9] 핵심실적 완료")
 ws3 = wb.create_sheet("2025실적")
 ws3.sheet_properties.tabColor = "27AE60"
 set_col_widths(ws3, [14, 14, 14, 14, 14, 16, 16])
+setup_print(ws3)
 
 row = 1
 ws3.merge_cells('A1:G1')
@@ -483,6 +503,7 @@ print("  [3/9] 2025실적 완료")
 ws4 = wb.create_sheet("사업구조")
 ws4.sheet_properties.tabColor = "D4A843"
 set_col_widths(ws4, [18, 14, 14, 14, 14, 14, 14, 14])
+setup_print(ws4)
 
 row = 1
 ws4.merge_cells('A1:H1')
@@ -584,6 +605,7 @@ print("  [4/9] 사업구조 완료")
 ws5 = wb.create_sheet("주주환원")
 ws5.sheet_properties.tabColor = "E74C3C"
 set_col_widths(ws5, [12, 14, 12, 14, 14, 14])
+setup_print(ws5)
 
 row = 1
 ws5.merge_cells('A1:F1')
@@ -682,6 +704,7 @@ print("  [5/9] 주주환원 완료")
 ws6 = wb.create_sheet("규제_면허")
 ws6.sheet_properties.tabColor = "8E44AD"
 set_col_widths(ws6, [20, 50, 20])
+setup_print(ws6)
 
 row = 1
 ws6.merge_cells('A1:C1')
@@ -776,6 +799,7 @@ print("  [6/9] 규제_면허 완료")
 ws7 = wb.create_sheet("투자지표")
 ws7.sheet_properties.tabColor = "E67E22"
 set_col_widths(ws7, [20, 16, 40])
+setup_print(ws7)
 
 row = 1
 ws7.merge_cells('A1:C1')
@@ -879,6 +903,7 @@ print("  [7/9] 투자지표 완료")
 ws8 = wb.create_sheet("시나리오")
 ws8.sheet_properties.tabColor = "2ECC71"
 set_col_widths(ws8, [16, 18, 18, 18, 18])
+setup_print(ws8)
 
 row = 1
 ws8.merge_cells('A1:E1')
@@ -1055,6 +1080,7 @@ print("  [8/9] 시나리오 완료")
 ws9 = wb.create_sheet("모니터링")
 ws9.sheet_properties.tabColor = "1ABC9C"
 set_col_widths(ws9, [6, 30, 40, 20])
+setup_print(ws9)
 
 row = 1
 ws9.merge_cells('A1:D1')
