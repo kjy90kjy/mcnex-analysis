@@ -12,8 +12,17 @@ OpenDART API에서 한국 상장기업의 공시 데이터를 수집하고, SQLi
 
 | 종목코드 | 기업명 | 업종 | 보고서 수 | 비고 |
 |----------|--------|------|----------|------|
-| 097520 | 엠씨넥스 | 카메라모듈 부품 | 5종 | 최초 구축 |
-| 035250 | 강원랜드 | 카지노/리조트 | 6종 | 규제독점, 무차입경영 |
+| 097520 | 엠씨넥스 | 카메라모듈 부품 | 6종 | 최초 구축 |
+| 035250 | 강원랜드 | 카지노/리조트 | 7종 | 규제독점, 무차입경영 |
+| 003490 | 대한항공 | 항공운송 | 7종 | 아시아나 합병, 고레버리지 |
+
+## 의존성
+
+요구사항 파일 없음. 임포트에서 추론:
+- `requests` — OpenDART API 호출
+- `openpyxl` — 엑셀 보고서 생성
+- `pywin32` (`win32com`) — `export_pdf.py` 전용 (Excel COM 자동화, Windows 한정)
+- Python 3 표준 라이브러리: `sqlite3`, `json`, `xml.etree.ElementTree`, `zipfile`, `subprocess`
 
 ## 폴더 구조
 
@@ -22,47 +31,46 @@ mcnex-analysis/
   config.py              # API 키 + 공용 유틸리티 (get_company_dir, ensure_company_dir)
   run_pipeline.py        # 전체 파이프라인 한번에 실행
   download_all.py        # 1단계: 공시 다운로드
-  build_db.py            # 2단계: 원문 DB 생성
-  build_full_db.py       # 3단계: 구조화 DB 생성
+  build_db.py            # 2단계: 원문 DB 생성 (FTS5)
+  build_full_db.py       # 3단계: 구조화 DB 생성 (15종 API)
   build_ai_db.py         # 4단계: 통합 AI DB 생성
-  Method/                # 분석 프레임워크 문서 (Korean_Guru_Framework.md 포함)
+  export_pdf.py          # xlsx → PDF 변환 (Excel COM, Windows 전용)
+  Method/                # 분석 프레임워크 문서
+    Korean_Guru_Framework.md     # Buffett/Munger Four Filters 한국시장 적용
+    Corporate_Analysis_Framework # 종합 투자분석 프레임워크
+    AI_Prompt_Templates          # LLM 분석용 프롬프트 템플릿
   companies/
-    097520_엠씨넥스/     # 종목코드_회사명 폴더
-      create_report.py        # → 엠씨넥스_기업분석보고서.xlsx (9시트)
-      create_valuation.py     # → 엠씨넥스_밸류에이션.xlsx (5시트)
-      create_combined.py      # → 엠씨넥스_종합보고서.xlsx (12시트)
-      create_mobile.py        # → 엠씨넥스_모바일용.xlsx (단일시트)
-      create_guru_report.py   # → 엠씨넥스_투자구루분석.xlsx (7시트)
-    035250_강원랜드/
-      create_report.py        # → 강원랜드_기업분석보고서.xlsx (9시트)
-      create_valuation.py     # → 강원랜드_밸류에이션.xlsx (5시트)
-      create_combined.py      # → 강원랜드_종합보고서.xlsx (12시트)
-      create_mobile.py        # → 강원랜드_모바일용.xlsx (단일시트)
-      create_guru_report.py   # → 강원랜드_투자구루분석.xlsx (7시트)
-      create_profit_analysis.py # → 강원랜드_이익역성장분석.xlsx (7시트)
+    {종목코드}_{회사명}/
+      ai.db, dart.db, full.db   # 파이프라인 생성 DB (gitignored)
+      company_info.json          # 메타데이터 (gitignored)
+      disclosure_list.json       # 공시목록 (gitignored)
+      downloads/                 # 공시 ZIP 파일 (gitignored)
+      create_report.py           # → 기업분석보고서 (9시트)
+      create_valuation.py        # → 밸류에이션 (5시트)
+      create_combined.py         # → 종합보고서 (12시트)
+      create_mobile.py           # → 모바일용 (1시트)
+      create_guru_report.py      # → 투자구루분석 (7시트)
+      create_master.py           # → 마스터보고서 (통합, 종합+구루+α)
+      create_profit_analysis.py  # → 이익역성장분석 (강원랜드 전용)
+      create_debt_analysis.py    # → 항공업구조분석 (대한항공 전용)
+      create_segment_analysis.py # → 사업부문별수익분석 (대한항공 전용)
 ```
 
-각 회사 폴더에는 파이프라인 실행 시 자동 생성되는 파일도 포함:
-- `company_info.json`, `disclosure_list.json` (메타데이터)
-- `downloads/` (공시 ZIP 파일)
-- `dart.db` (원문 DB, FTS), `full.db` (구조화 DB), `ai.db` (통합 분석용 DB)
-- `*.xlsx` (보고서 출력)
+**Git LFS**: `*.db` 파일과 `downloads/*.zip`은 `.gitattributes`에서 Git LFS로 추적.
+**gitignored**: `*.db`, `*.xlsx`, `downloads/`, `disclosure_list.json`, `company_info.json`
 
 ## 실행 명령어
 
-모든 스크립트는 Python 3. 의존성은 `requests`(데이터 수집)와 `openpyxl`(보고서 생성).
-
-**Windows 인코딩 주의**: `run_pipeline.py`로 실행 시 UnicodeEncodeError 발생 가능. 아래처럼 개별 실행 권장:
+**Windows 인코딩 주의**: `run_pipeline.py`로 실행 시 UnicodeEncodeError 발생 가능. 개별 실행 권장:
 ```bash
-set PYTHONIOENCODING=utf-8 && python -X utf8 download_all.py 035250
+set PYTHONIOENCODING=utf-8 && python -X utf8 <script>.py <종목코드>
 ```
 
 ### 전체 파이프라인 (종목코드만 입력)
 
 ```bash
 # 새 기업 분석 (전체 4단계 자동 실행)
-python run_pipeline.py 097520    # 엠씨넥스
-python run_pipeline.py 035250    # 강원랜드
+python run_pipeline.py 097520
 
 # 개별 단계 실행 (Windows 인코딩 문제 시)
 set PYTHONIOENCODING=utf-8 && python -X utf8 download_all.py 035250
@@ -74,22 +82,20 @@ set PYTHONIOENCODING=utf-8 && python -X utf8 build_ai_db.py 035250
 ### 보고서 생성 (회사 폴더에서 실행)
 
 ```bash
-# 엠씨넥스
-cd companies/097520_엠씨넥스
-python create_report.py           # → 기업분석보고서 (9시트)
-python create_valuation.py        # → 밸류에이션 (5시트, 독립형)
-python create_combined.py         # → 종합보고서 (12시트)
-python create_mobile.py           # → 모바일용 (단일시트, 3열 세로)
-python create_guru_report.py      # → 투자구루분석 (7시트, Buffett/Munger)
-
-# 강원랜드
-cd companies/035250_강원랜드
+cd companies\035250_강원랜드
 set PYTHONIOENCODING=utf-8 && python -X utf8 create_report.py
 set PYTHONIOENCODING=utf-8 && python -X utf8 create_valuation.py
 set PYTHONIOENCODING=utf-8 && python -X utf8 create_combined.py
 set PYTHONIOENCODING=utf-8 && python -X utf8 create_mobile.py
 set PYTHONIOENCODING=utf-8 && python -X utf8 create_guru_report.py
-set PYTHONIOENCODING=utf-8 && python -X utf8 create_profit_analysis.py  # 이익역성장 분석 (강원랜드 전용)
+set PYTHONIOENCODING=utf-8 && python -X utf8 create_master.py
+```
+
+### PDF 변환 (프로젝트 루트에서, Windows 전용)
+
+```bash
+python export_pdf.py                                    # 기본 대상 모두 변환
+python export_pdf.py companies\097520_엠씨넥스\엠씨넥스_마스터보고서.xlsx  # 특정 파일
 ```
 
 ## 아키텍처
@@ -102,7 +108,7 @@ OpenDART API ─→ download_all.py ─→ companies/{code}_{name}/downloads/*.z
                                           │
                                     build_db.py ─→ dart.db (원문, FTS)
                                           │
-OpenDART API ─→ build_full_db.py ─→ full.db (구조화 정량)
+OpenDART API ─→ build_full_db.py ─→ full.db (구조화 정량, 15종 API)
                                           │
                            dart.db ──┐    │
                                      ▼    ▼
@@ -111,8 +117,13 @@ OpenDART API ─→ build_full_db.py ─→ full.db (구조화 정량)
                             ┌──────────┬──────────┬───┘
                             ▼          ▼          ▼
                      create_report  create_combined  create_mobile
-                     create_valuation  create_guru_report
-                     create_profit_analysis (강원랜드 전용)
+                     create_valuation  create_guru_report  create_profit_analysis
+                            │          │          │
+                            └──────┬───┘──────────┘
+                                   ▼
+                            create_master.py ─→ 마스터보고서.xlsx
+                                   │
+                            export_pdf.py ─→ 마스터보고서.pdf
 ```
 
 ### 스크립트 역할
@@ -122,29 +133,32 @@ OpenDART API ─→ build_full_db.py ─→ full.db (구조화 정량)
 | `config.py` | - | - | API_KEY, get_company_dir(), ensure_company_dir() |
 | `run_pipeline.py` | 종목코드 | - | subprocess로 4단계 순차 실행 |
 | `download_all.py` | 종목코드 | `downloads/`, `disclosure_list.json`, `company_info.json` | corpCode.xml에서 고유번호 조회 → 공시목록 페이징 → 문서 ZIP 다운로드 |
-| `build_db.py` | 종목코드 | `dart.db` | ZIP 내 XML을 멀티인코딩으로 파싱, BODY 텍스트 추출, FTS5 인덱스 |
-| `build_full_db.py` | 종목코드 | `full.db` | 15종 구조화 API를 연도×보고서구분 조합으로 호출 |
+| `build_db.py` | 종목코드 | `dart.db` | ZIP 내 XML을 멀티인코딩으로 파싱(utf-8→euc-kr→cp949→latin-1), BODY 텍스트 추출, FTS5 인덱스 |
+| `build_full_db.py` | 종목코드 | `full.db` | 15종 구조화 API를 연도×보고서구분 조합으로 호출, `time.sleep(0.3~1)` rate limiting |
 | `build_ai_db.py` | 종목코드 | `ai.db` | full_db + dart_db 통합, 사업보고서 8개 섹션 분리, 특허/이벤트/잠정실적 패턴매칭 |
 | `create_*.py` | `ai.db` | xlsx | 회사별 보고서 생성 (회사 폴더 내 위치) |
+| `create_master.py` | 개별 xlsx 파일들 | 마스터보고서.xlsx | 종합+구루+α 시트를 하나의 파일로 병합 |
+| `export_pdf.py` | 마스터보고서.xlsx | .pdf | win32com Excel COM 자동화, A4 가로 인쇄 |
 
-### 보고서 종류 (6종)
-
-| 보고서 | 시트 수 | 설명 |
-|--------|---------|------|
-| `create_report.py` | 9시트 | 기업분석보고서 (표지~모니터링) |
-| `create_valuation.py` | 5시트 | 밸류에이션 (PER/PBR/EV_EBITDA/RIM/시나리오) |
-| `create_combined.py` | 12시트 | 종합보고서 (report + valuation 통합) |
-| `create_mobile.py` | 1시트 | 모바일용 (3열 세로, 큰 폰트) |
-| `create_guru_report.py` | 7시트 | 투자구루분석 (Buffett/Munger Four Filters) |
-| `create_profit_analysis.py` | 7시트 | 이익역성장분석 (강원랜드 전용, 비용구조·일시적요인·인건비) |
+**주의**: 모든 `build_*.py` 스크립트는 기존 DB를 삭제 후 재생성함 (`os.remove` → 새 DB 생성).
 
 ### 보고서 스크립트 패턴
 
-모든 보고서 스크립트가 동일한 패턴:
-1. openpyxl 스타일 상수 정의 (NAVY, DARK_BLUE 등 색상 + Font/Fill/Alignment/Border 객체)
-2. 헬퍼 함수: `sw()`, `wh()`, `wr()`, `st()`, `fmt()`, `fw()`, `pct()`
-3. 시트별 순차 생성: 데이터 배열 → 행 단위 write → 수식 삽입
-4. 대부분의 보고서는 재무 데이터가 파이썬 상수로 하드코딩 (DB 의존 최소화)
+모든 `create_*.py`가 동일한 패턴:
+1. **스타일 상수**: `NAVY="1B2A4A"`, `DARK_BLUE="2C3E6B"` 등 색상 + Font/Fill/Alignment/Border 객체
+2. **헬퍼 함수** (이름과 시그니처 통일):
+   - `sw(ws, widths)` — 열 너비 설정
+   - `wh(ws, row, height)` — 행 높이 설정
+   - `wr(ws, row, data, ...)` — 데이터 행 쓰기
+   - `st(ws, row, text, ...)` — 스타일 텍스트 쓰기
+   - `fmt(value)` — 억원 포맷 (`÷ 100,000,000`)
+   - `fw(value)` — 원 포맷
+   - `pct(value)` — 퍼센트 포맷
+3. **데이터**: 대부분 재무 데이터가 **파이썬 상수로 하드코딩** (DB 의존 최소화). 새 기업 보고서 작성 시 해당 기업 데이터로 교체 필요.
+4. **인쇄 설정**: Letter 용지 가로 방향, `fitToWidth=1, fitToHeight=0`
+5. **폰트**: 맑은 고딕 (Malgun Gothic) 통일
+
+`create_master.py`는 openpyxl `load_workbook`으로 개별 보고서를 열고 시트를 복사하여 하나의 파일로 병합. 중복 시트명에는 접미사 추가.
 
 ### DB 스키마 (ai.db)
 
@@ -164,8 +178,15 @@ OpenDART API ─→ build_full_db.py ─→ full.db (구조화 정량)
 - 연결 재무제표: `reprt_nm LIKE '%연결%'` / 개별: `reprt_nm LIKE '%개별%'`
 - `business_report_sections.section_name` 값: 회사개요, 회사연혁, 사업내용, 주요제품_매출, 연구개발, 위험관리_전망, 임원_보수, 주주_배당
 - API 키는 `config.py`에 중앙 관리
-- 회사 폴더: `companies/{종목코드}_{회사명}/` 형식으로 자동 생성
+- 회사 폴더: `companies/{종목코드}_{회사명}/` 형식으로 자동 생성 (`ensure_company_dir`)
 - 데이터 출처: OpenDART API (https://opendart.fss.or.kr)
+
+### 새 기업 추가 절차
+
+1. 파이프라인 실행: `python run_pipeline.py {종목코드}` → 자동으로 `companies/{코드}_{이름}/` 생성 + DB 4종 구축
+2. 기존 기업의 `create_*.py`를 새 폴더로 복사
+3. 스크립트 내 하드코딩된 데이터(기업명, 주가, 주식수, 재무 상수 등)를 새 기업 데이터로 교체
+4. `create_master.py`의 `SOURCES` 리스트와 `OUTPUT` 파일명 수정
 
 ### 기업별 데이터 특이사항
 
@@ -177,6 +198,20 @@ OpenDART API ─→ build_full_db.py ─→ full.db (구조화 정량)
 - 개별 보수 공시 미해당 (CEO 보수 비공개)
 - 특허 없음 (카지노업)
 - treasury_stock의 stock_knd가 연도별로 '보통주식'/'보통주'/None 혼재
+
+**대한항공 (003490)**:
+- 매출 계정명 변경: "매출" (2015-2023) → "영업수익" (2024)
+- `v_annual_performance` 뷰가 빈 매출값 반환 → `financial_summary`에서 `account_nm='매출액'`으로 직접 쿼리 필요
+- 2024년 아시아나항공 합병으로 자산/부채 급증 (자산 +16.6조, 부채 +15.5조)
+- 리스부채 10.9조원 (IFRS 16) → 부채비율 329%이나 리스 제외 시 약 180%
+- 특허 없음 (항공운송업), 항공우주사업부 R&D는 별도 집계
+- 전용 보고서: create_debt_analysis.py (항공업 구조분석), create_segment_analysis.py (사업부문별 수익분석)
+
+### Method/ 분석 프레임워크
+
+- **Korean_Guru_Framework.md**: Buffett/Munger Four Filters를 한국시장에 적용. Korea Discount 반영 멀티플(PER 8-12x, PBR 0.8-1.5x), 100점 스코어카드, A-D 등급
+- **Corporate_Analysis_Framework**: 종합 투자분석 프레임워크. 무형자산 평가, AI 통합, 공급망 회복력, 2트랙 분석(합리적+심리적)
+- **AI_Prompt_Templates**: Four Filters 평가용 시스템 프롬프트, 산업별 체크리스트, 분기별 트래킹, 다기업 비교 템플릿
 
 ## 자주 쓰는 쿼리
 
@@ -202,4 +237,7 @@ SELECT rcept_dt, event_type, event_summary FROM key_events ORDER BY rcept_dt DES
 
 -- 잠정실적 공시
 SELECT rcept_dt, report_nm, content FROM earnings_announcements ORDER BY rcept_dt DESC;
+
+-- DB 전체 요약 (테이블별 건수)
+SELECT * FROM v_db_summary;
 ```
